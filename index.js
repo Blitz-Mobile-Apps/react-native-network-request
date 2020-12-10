@@ -1,6 +1,6 @@
 import { NativeModules } from "react-native";
 
-const fetch = async (url, config) => {
+export const fetch = async (url, config) => {
   const { RNNetworkRequest } = NativeModules;
   var configToSend = {};
   if (!url) {

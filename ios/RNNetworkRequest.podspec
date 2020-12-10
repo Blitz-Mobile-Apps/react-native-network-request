@@ -1,12 +1,12 @@
 
 Pod::Spec.new do |s|
   s.name         = "RNNetworkRequest"
-  s.version      = "1.0.1"
+  s.version      = "1.0.2"
   s.summary      = "RNNetworkRequest"
   s.description  = <<-DESC
                   RNNetworkRequest
                    DESC
-  s.homepage     = ""
+  s.homepage     = "https://github.com/Blitz-Mobile-Apps/react-native-network-request.git"
   s.license      = "MIT"
   # s.license      = { :type => "MIT", :file => "FILE_LICENSE" }
   s.author             = { "author" => "alex.evans1230@gmail.com" }
