@@ -23,6 +23,19 @@ export const fetch = async (url, config) => {
   }
   try {
     const res = await RNNativeRequest.fetch(url, configToSend);
+    if (Platform.OS == "android") {
+      try {
+
+        res = JSON.parse(res)
+        // console.log(res);
+        if (res.data) {
+          res.data = JSON.parse(res.data)
+        }
+
+      } catch (error) {
+        console.log("JSON parse error", error);
+      }
+    }
     return Promise.resolve(res);
   } catch (e) {
     return Promise.reject(e);
