@@ -9,7 +9,6 @@ import android.util.Log;
 import androidx.annotation.NonNull;
 import androidx.annotation.RequiresApi;
 
-import com.entertainmentoxygen.NativeFetch.RequestProgress;
 import com.facebook.react.bridge.Promise;
 import com.facebook.react.bridge.ReactApplicationContext;
 import com.facebook.react.bridge.ReactContextBaseJavaModule;
@@ -18,7 +17,6 @@ import com.facebook.react.bridge.ReadableArray;
 import com.facebook.react.bridge.ReadableMap;
 import com.facebook.react.bridge.ReadableMapKeySetIterator;
 import com.facebook.react.bridge.ReadableType;
-import com.google.gson.JsonObject;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -28,6 +26,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.Map;
 
 import okhttp3.Call;
@@ -41,7 +40,7 @@ import okhttp3.RequestBody;
 import okhttp3.Response;
 import okhttp3.ResponseBody;
 
-public class RNNativeRequestModule extends ReactContextBaseJavaModule {
+public class RNNetworkRequestModule extends ReactContextBaseJavaModule {
     private final String TAG = "RNNativeRequestModule";
     private final OkHttpClient client = new OkHttpClient();
     public static final MediaType MEDIA_TYPE_MARKDOWN
@@ -50,7 +49,7 @@ public class RNNativeRequestModule extends ReactContextBaseJavaModule {
 
     //    RequestQueue requestQueue = null;
     public static ReactApplicationContext reactContext;
-    public RNNativeRequestModule(ReactApplicationContext reactContext) {
+    public RNNetworkRequestModule(ReactApplicationContext reactContext) {
 
         super(reactContext);
     }
@@ -73,40 +72,47 @@ public class RNNativeRequestModule extends ReactContextBaseJavaModule {
         return map;
     }
 
-    @RequiresApi(api = Build.VERSION_CODES.N)
     public void handlePost(String urlString, JSONObject headers, String body, Promise promise){
-        this.handleJSONRequest(com.android.volley.Request.Method.POST,urlString,headers,body,promise);
+        this.handleJSONRequest(urlString,headers,body,promise);
     }
-    @RequiresApi(api = Build.VERSION_CODES.N)
+
     public void handlePut(String urlString, JSONObject headers, String body, Promise promise){
-        this.handleJSONRequest(com.android.volley.Request.Method.PUT,urlString,headers,body,promise);
+        this.handleJSONRequest(urlString,headers,body,promise);
     }
-    @RequiresApi(api = Build.VERSION_CODES.N)
+
     public void handleDelete(String urlString, JSONObject headers, String body, Promise promise){
-        this.handleJSONRequest(com.android.volley.Request.Method.DELETE,urlString,headers,body,promise);
+        this.handleJSONRequest(urlString,headers,body,promise);
     }
-    @RequiresApi(api = Build.VERSION_CODES.N)
-    public void handleJSONRequest(int method, String urlString, JSONObject headers, String body, Promise promise){
 
-        Headers.Builder head = new Headers.Builder();
+    public void handleJSONRequest(String urlString, JSONObject headers, String body, final Promise promise){
 
-
-        JSONObject finalJsonHeaders = headers;
-        headers.keys().forEachRemaining((s) -> {
-
-            try {
-                Log.d("Array", "Converted header key  : " + s + " value :  " +  finalJsonHeaders.get(s));
-                head.add(s, finalJsonHeaders.get(s).toString());
-            } catch (JSONException e) {
-                e.printStackTrace();
-            }
+        // Headers.Builder head = new Headers.Builder();
 
 
-        });
+    //     JSONObject finalJsonHeaders = headers;
+    //     for (String s : headers.keySet()) {
+    //      try {
+    //             Log.d("Array", "Converted header key  : " + s + " value :  " +  finalJsonHeaders.get(s));
+    //             head.add(s, finalJsonHeaders.get(s).toString());
+    //         } catch (JSONException e) {
+    //             e.printStackTrace();
+    //         }
+    // }
+    //     // headers.keys().forEachRemaining((s) -> {
 
-        Headers allHeaders = head.build();
+    //     //     try {
+    //     //         Log.d("Array", "Converted header key  : " + s + " value :  " +  finalJsonHeaders.get(s));
+    //     //         head.add(s, finalJsonHeaders.get(s).toString());
+    //     //     } catch (JSONException e) {
+    //     //         e.printStackTrace();
+    //     //     }
+
+
+    //     // });
+
+    //     Headers allHeaders = head.build();
         Request request = new Request.Builder()
-                .headers(allHeaders)
+                .headers(compileHeaders(headers))
                 .post(RequestBody.create(MEDIA_TYPE_MARKDOWN, body))
                 .url(urlString)
                 .build();
@@ -116,74 +122,65 @@ public class RNNativeRequestModule extends ReactContextBaseJavaModule {
                 e.printStackTrace();
             }
 
+            @RequiresApi(api = Build.VERSION_CODES.KITKAT)
             @Override public void onResponse(Call call, Response response) throws IOException {
                 try (ResponseBody responseBody = response.body()) {
-                    if (!response.isSuccessful()){
-                        JsonObject obj = new JsonObject();
-                        obj.addProperty("code", response.code());
-                        obj.addProperty("message",response.message());
-                        promise.resolve(obj.toString());
-                        throw new IOException("Unexpected code " + response);
-                    }
-
-                    Headers responseHeaders = response.headers();
-                    for (int i = 0, size = responseHeaders.size(); i < size; i++) {
-                        System.out.println(responseHeaders.name(i) + ": " + responseHeaders.value(i));
-                    }
-
-//                    System.out.println(responseBody.string());
-                    JsonObject obj = new JsonObject();
-                    obj.addProperty("code", response.code());
-                    obj.addProperty("data",responseBody.string());
-                    promise.resolve(obj.toString());
+                    parseResponse(response,promise);
+                } catch (JSONException e) {
+                    e.printStackTrace();
                 }
             }
         });
     }
 
-    @RequiresApi(api = Build.VERSION_CODES.N)
-    public Headers getHeaders(JSONObject headers){
-        Headers.Builder head = new Headers.Builder();
-
-
-        JSONObject finalJsonHeaders = headers;
-        headers.keys().forEachRemaining((s) -> {
-
-            try {
-                Log.d("Array", "Converted header key  : " + s + " value :  " +  finalJsonHeaders.get(s));
-                head.add(s, finalJsonHeaders.get(s).toString());
-            } catch (JSONException e) {
-                e.printStackTrace();
+    @RequiresApi(api = Build.VERSION_CODES.KITKAT)
+    public void parseResponse(Response response, Promise promise) throws JSONException {
+        try (ResponseBody responseBody = response.body()) {
+            if (!response.isSuccessful()) {
+                JSONObject obj = new JSONObject();
+                obj.put("code", response.code());
+                obj.put("message", response.message());
+                promise.resolve(obj.toString());
             }
 
+            Headers responseHeaders = response.headers();
+            for (int i = 0, size = responseHeaders.size(); i < size; i++) {
+                System.out.println(responseHeaders.name(i) + ": " + responseHeaders.value(i));
+            }
 
-        });
+//                    System.out.println(responseBody.string());
+            JSONObject obj = new JSONObject();
+            obj.put("code", response.code());
+            obj.put("data", responseBody.string());
+            promise.resolve(obj.toString());
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
 
+    public Headers compileHeaders(JSONObject headers){
+        Headers.Builder head = new Headers.Builder();
+        JSONObject finalJsonHeaders = headers;
+        for (Iterator<String> it = headers.keys(); it.hasNext(); ) {
+            String s = it.next();
+            try {
+                   Log.d("Array", "Converted header key  : " + s + " value :  " +  finalJsonHeaders.get(s));
+                   head.add(s, finalJsonHeaders.get(s).toString());
+               } catch (JSONException e) {
+                   e.printStackTrace();
+               }
+        }
         return head.build();
 
     }
 
-    @RequiresApi(api = Build.VERSION_CODES.N)
-    public void handleGet(String urlString, JSONObject headers, Promise promise){
-        Headers.Builder head = new Headers.Builder();
+    public void handleGet(String urlString, JSONObject headers, final Promise promise){
+        // Headers.Builder head = new Headers.Builder();
 
 
-        JSONObject finalJsonHeaders = headers;
-        headers.keys().forEachRemaining((s) -> {
-
-            try {
-                Log.d("Array", "Converted header key  : " + s + " value :  " +  finalJsonHeaders.get(s));
-                head.add(s, finalJsonHeaders.get(s).toString());
-            } catch (JSONException e) {
-                e.printStackTrace();
-            }
-
-
-        });
-
-        Headers allHeaders = head.build();
+        
         Request request = new Request.Builder()
-                .headers(allHeaders)
+                .headers(compileHeaders(headers))
                 .url(urlString)
                 .build();
 
@@ -193,31 +190,19 @@ public class RNNativeRequestModule extends ReactContextBaseJavaModule {
                 e.printStackTrace();
             }
 
+            @RequiresApi(api = Build.VERSION_CODES.KITKAT)
             @Override public void onResponse(Call call, Response response) throws IOException {
-                try (ResponseBody responseBody = response.body()) {
-                    if (!response.isSuccessful()){
-                        JsonObject obj = new JsonObject();
-                        obj.addProperty("code", response.code());
-                        obj.addProperty("message",response.message());
-                        promise.resolve(obj.toString());
-                        throw new IOException("Unexpected code " + response);
-                    }
-
-                    Headers responseHeaders = response.headers();
-                    for (int i = 0, size = responseHeaders.size(); i < size; i++) {
-                        System.out.println(responseHeaders.name(i) + ": " + responseHeaders.value(i));
-                    }
-                    JsonObject obj = new JsonObject();
-                    obj.addProperty("code", response.code());
-                    obj.addProperty("data",responseBody.string());
-                    promise.resolve(obj.toString());
+                try {
+                    parseResponse(response,promise);
+                } catch (JSONException e) {
+                    e.printStackTrace();
                 }
             }
         });
 
     }
-    @RequiresApi(api = Build.VERSION_CODES.N)
-    public void handleMultipartRequest(String urlString, JSONObject headers, ReadableMap mapBody, Promise promise) throws JSONException {
+
+    public void handleMultipartRequest(String urlString, JSONObject headers, ReadableMap mapBody, final Promise promise) throws JSONException {
 
         JSONObject jsonBody = convertMapToJson(mapBody);
         RequestBody body = RequestBody.create(JSON, String.valueOf(jsonBody));
@@ -266,20 +251,20 @@ public class RNNativeRequestModule extends ReactContextBaseJavaModule {
             buildernew.addPart(body);
 
             // calculating upload stream
-            RequestProgress newReq = null;
-            newReq = new RequestProgress(buildernew.build(), new RequestProgress.Listener() {
-                @Override
-                public void onRequestProgress(long bytesWritten, long contentLength) {
-                    float percentage = 100f * bytesWritten / contentLength;
+//            RequestProgress newReq = null;
+//            newReq = new RequestProgress(buildernew.build(), new RequestProgress.Listener() {
+//                @Override
+//                public void onRequestProgress(long bytesWritten, long contentLength) {
+//                    float percentage = 100f * bytesWritten / contentLength;
+//
+//                    percentage = Math.round(percentage);
+//
+//                    // TODO: Do something useful with the values
+//                    Log.d("CountingBodyProgress", "onRequestProgress: " + percentage + "  uploaded " + bytesWritten + " out of  " + contentLength);
+//                }
+//            });
 
-                    percentage = Math.round(percentage);
-
-                    // TODO: Do something useful with the values
-                    Log.d("CountingBodyProgress", "onRequestProgress: " + percentage + "  uploaded " + bytesWritten + " out of  " + contentLength);
-                }
-            });
-
-            Request request = new Request.Builder().headers(getHeaders(headers)).url(urlString).post(newReq).build();
+            Request request = new Request.Builder().headers(compileHeaders(headers)).url(urlString).post(buildernew.build()).build();
 
         client.newCall(request).enqueue(new Callback() {
             @Override public void onFailure(Call call, IOException e) {
@@ -287,24 +272,12 @@ public class RNNativeRequestModule extends ReactContextBaseJavaModule {
                 e.printStackTrace();
             }
 
+            @RequiresApi(api = Build.VERSION_CODES.KITKAT)
             @Override public void onResponse(Call call, Response response) throws IOException {
-                try (ResponseBody responseBody = response.body()) {
-                    if (!response.isSuccessful()){
-                        JsonObject obj = new JsonObject();
-                        obj.addProperty("code", response.code());
-                        obj.addProperty("message",response.message());
-                        promise.resolve(obj.toString());
-                        throw new IOException("Unexpected code " + response);
-                    }
-
-                    Headers responseHeaders = response.headers();
-                    for (int i = 0, size = responseHeaders.size(); i < size; i++) {
-                        System.out.println(responseHeaders.name(i) + ": " + responseHeaders.value(i));
-                    }
-                    JsonObject obj = new JsonObject();
-                    obj.addProperty("code", response.code());
-                    obj.addProperty("data",responseBody.string());
-                    promise.resolve(obj.toString());
+                try {
+                    parseResponse(response,promise);
+                } catch (JSONException e) {
+                    e.printStackTrace();
                 }
             }
         });
@@ -386,7 +359,7 @@ public class RNNativeRequestModule extends ReactContextBaseJavaModule {
         }
         return array;
     }
-    @RequiresApi(api = Build.VERSION_CODES.N)
+
     @ReactMethod
     public void fetch(String urlAsString, ReadableMap configs, Promise promise) throws UnsupportedEncodingException, JSONException {
         String urlString = urlAsString;

@@ -12,7 +12,7 @@ Pod::Spec.new do |s|
   s.author             = { "author" => "alex.evans1230@gmail.com" }
   s.platform     = :ios, "10.0"
   s.source       = { :git => "https://github.com/Blitz-Mobile-Apps/react-native-network-request.git", :tag => "master" }
-  s.source_files  = "RNNetworkRequest/**/*.{h,m}"
+  s.source_files  = "ios/*.{h,m}"
   s.requires_arc = true
 
 

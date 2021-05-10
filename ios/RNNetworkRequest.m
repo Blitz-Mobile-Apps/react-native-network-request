@@ -120,13 +120,13 @@ RCT_EXPORT_METHOD(fetch:(NSString *)urlString jsRequest:(NSDictionary *)jsReques
     [request setAllHTTPHeaderFields:headers];
     NSURLSession *session = [NSURLSession sessionWithConfiguration:[NSURLSessionConfiguration defaultSessionConfiguration]];
     NSURLSessionDataTask *task = [session dataTaskWithRequest:request completionHandler:^(NSData * _Nullable data, NSURLResponse * _Nullable response, NSError * _Nullable error) {
-      [self handleRequestResolve:data withResponse:response withError:error resolve:resolve rejecter:reject];
+      [self handleRequestResolve:data withResponse:response withError:error resolve:resolve rejecter:reject url:url];
     }];
     [task resume];
   });
 }
 
--(void)handleRequestResolve:(NSData *) data withResponse:(NSURLResponse *) response withError:(NSError *) error resolve:(RCTPromiseResolveBlock)resolve rejecter:(RCTPromiseRejectBlock)reject{
+-(void)handleRequestResolve:(NSData *) data withResponse:(NSURLResponse *) response withError:(NSError *) error resolve:(RCTPromiseResolveBlock)resolve rejecter:(RCTPromiseRejectBlock)reject url:(NSURL *)url{
   NSString *dataString = [[NSString alloc] initWithData:data encoding:NSISOLatin1StringEncoding];
 
   NSData *dataUTF8 = [dataString dataUsingEncoding:NSUTF8StringEncoding];
@@ -139,11 +139,12 @@ RCT_EXPORT_METHOD(fetch:(NSString *)urlString jsRequest:(NSDictionary *)jsReques
       NSNumber *statusCode = [NSNumber numberWithLong:[httpResponse statusCode]];
       NSMutableDictionary *dataToSend;
       if(dict != nil){
-        dataToSend = [NSMutableDictionary dictionaryWithDictionary:@{@"response":dict}];
+        dataToSend = [NSMutableDictionary dictionaryWithDictionary:@{@"data":dict}];
       }else{
-        dataToSend = [NSMutableDictionary dictionaryWithDictionary:@{@"response":error.userInfo}];
+        dataToSend = [NSMutableDictionary dictionaryWithDictionary:@{@"data":error.userInfo}];
       }
       [dataToSend setValue:statusCode forKey:@"status"];
+      [dataToSend setValue:url forKey:@"url"];
       if (dataToSend != nil) {
         dispatch_async(dispatch_get_main_queue(), ^(void) {
           resolve(dataToSend);
@@ -164,7 +165,7 @@ RCT_EXPORT_METHOD(fetch:(NSString *)urlString jsRequest:(NSDictionary *)jsReques
   [request setHTTPBody:[body dataUsingEncoding:NSUTF8StringEncoding]]; //body
   NSURLSession *session = [NSURLSession sessionWithConfiguration:[NSURLSessionConfiguration defaultSessionConfiguration]];
   NSURLSessionDataTask *task = [session dataTaskWithRequest:request completionHandler:^(NSData * _Nullable data, NSURLResponse * _Nullable response, NSError * _Nullable error) {
-    [self handleRequestResolve:data withResponse:response withError:error resolve:resolve rejecter:reject];
+    [self handleRequestResolve:data withResponse:response withError:error resolve:resolve rejecter:reject url:url];
   }];
   [task resume];
   });
@@ -211,7 +212,7 @@ RCT_EXPORT_METHOD(fetch:(NSString *)urlString jsRequest:(NSDictionary *)jsReques
       [request setHTTPBody:httpBody];
       NSURLSession *session = [NSURLSession sessionWithConfiguration:[NSURLSessionConfiguration defaultSessionConfiguration]];
       NSURLSessionTask *task = [session uploadTaskWithRequest:request fromData:httpBody completionHandler:^(NSData * _Nullable data, NSURLResponse * _Nullable response, NSError * _Nullable error) {
-        [self handleRequestResolve:data withResponse:response withError:error resolve:resolve rejecter:reject];
+        [self handleRequestResolve:data withResponse:response withError:error resolve:resolve rejecter:reject url:url];
       }];
       [task resume];
     }
